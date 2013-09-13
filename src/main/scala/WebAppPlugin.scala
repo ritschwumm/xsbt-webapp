@@ -38,9 +38,9 @@ object WebAppPlugin extends Plugin {
 	/** webapp contents */
 	val webappResources			= SettingKey[File]("webapp-resources")
 	/** library dependencies to include. */
-	val webappLibraries			= TaskKey[Seq[File]]("webapp-libraries")
+	val webappLibraries			= TaskKey[Traversable[File]]("webapp-libraries")
 	/** additional resources as a task to allow inclusion of generated content. */
-	val webappExtras			= TaskKey[Seq[(File,String)]]("webapp-extras")
+	val webappExtras			= TaskKey[Traversable[(File,String)]]("webapp-extras")
 	/** where to put the webapp's contents */
 	val webappOutput			= SettingKey[File]("webapp-output")
 	
@@ -51,32 +51,33 @@ object WebAppPlugin extends Plugin {
 	/** basename for copy-deploy */
 	val webappDeployName		= SettingKey[String]("webapp-deploy-name")
 	
-	lazy val webappSettings	= classpathSettings ++ Seq(
-		webappBuild				<<= buildTask,
-		webappResources			<<= (sourceDirectory in Compile) { _ / "webapp" },
-		//webappLibraries			<<= update map { _ select configurationFilter("webapp") },
-		webappLibraries			<<= update map { _ matching webappDependencyFilter },
-		webappExtras			:= Seq.empty,
-		webappOutput			<<= Keys.crossTarget { _ / "webapp" },
-		
-		webappDeploy			<<= deployTask,
-		webappDeployBase		:= null,
-		webappDeployName		<<= name,
-		
-		ivyConfigurations		+= webappConfig,
-		watchSources			<<= (watchSources, webappResources/*, webappExtras*/) map { 
-			(watchSources, webappResources/*, webappExtras*/) => {
-				val resourceFiles	= webappResources.***.get
-				/*val extraFiles		= webappExtras map { _._1 }*/
-				watchSources ++ resourceFiles /*++ extraFiles*/
-			}
-		}
-	)
+	lazy val webappSettings:Seq[Def.Setting[_]]	= 
+			classpathSettings ++
+			Seq(
+				webappBuild				<<= buildTask,
+				webappResources			<<= (sourceDirectory in Compile) { _ / "webapp" },
+				//webappLibraries		<<= update map { _ select configurationFilter("webapp") },
+				webappLibraries			<<= update map { _ matching webappDependencyFilter },
+				webappExtras			:= Seq.empty,
+				webappOutput			<<= Keys.crossTarget { _ / "webapp" },
+				
+				webappDeploy			<<= deployTask,
+				webappDeployBase		:= null,
+				webappDeployName		<<= name,
+				
+				ivyConfigurations		+= webappConfig,
+				watchSources			<<= (watchSources, webappResources) map { 
+					(watchSources, webappResources) => {
+						val resourceFiles	= webappResources.***.get
+						watchSources ++ resourceFiles
+					}
+				}
+			)
 	
 	//------------------------------------------------------------------------------
 	//## tasks
 	
-	private def buildTask:Initialize[Task[File]] = (
+	private def buildTask:Def.Initialize[Task[File]] = (
 		Keys.streams,
 		classpathAssets,
 		webappResources,
@@ -89,11 +90,11 @@ object WebAppPlugin extends Plugin {
 		streams:TaskStreams,	
 		assets:Seq[ClasspathAsset],
 		resources:File,
-		libraries:Seq[File],
-		extras:Seq[(File,String)],
+		libraries:Traversable[File],
+		extras:Traversable[(File,String)],
 		output:File
 	):File = {
-		streams.log info ("extracting webapp code libraries to " + output)
+		streams.log info ("extracting webapp resource libraries to " + output)
 		val dependenciesCopied	= libraries flatMap { library =>
 			IO unzip (library, output, -(new ExactFilter("META-INF/MANIFEST.MF"))) 
 		}
@@ -126,7 +127,7 @@ object WebAppPlugin extends Plugin {
 		output
 	}
 	
-	private def deployTask:Initialize[Task[Unit]] = (
+	private def deployTask:Def.Initialize[Task[Unit]] = (
 		Keys.streams,
 		webappBuild,
 		webappDeployBase,
