@@ -12,10 +12,26 @@ Build and publish the plugin:
     sbt publish-local
     
 Add the plugin to your project in project/plugins.sbt:
-    addSbtPlugin("de.djini" % "xsbt-webapp" % "0.2.0")
+    addSbtPlugin("de.djini" % "xsbt-webapp" % "0.3.0")
     
 Include the plugin in you project's build.sbt:
 
     webappSettings
     
 Run the webapp task to get a web application directory.
+
+If you need a war file include xsbt-zipper from
+     https://github.com/ritschwumm/xsbt-classpath
+and add something like this to your build.sbt:
+
+    // webapp::zipper
+    inTask(webappBuild)(zipperSettings ++ Seq(
+        zipperFiles     := selectSubpaths(webappBuild.value, AllPassFilter).toSeq,
+        zipperPrefix    := None,
+        zipperExtension := ".war"
+    ))
+    
+    // alias for webapp::zipper
+    TaskKey[File]("war")    := (zipperBuild in webappBuild).value
+
+Then run the war task to get a zipped up war file.

@@ -94,17 +94,17 @@ object WebAppPlugin extends Plugin {
 		extras:Traversable[(File,String)],
 		output:File
 	):File = {
-		streams.log info ("extracting webapp resource libraries to " + output)
+		streams.log info s"extracting webapp resource libraries to ${output}"
 		val dependenciesCopied	= libraries flatMap { library =>
 			IO unzip (library, output, -(new ExactFilter("META-INF/MANIFEST.MF"))) 
 		}
 		
-		streams.log info ("copying webapp resources to " + output)
+		streams.log info s"copying webapp resources to ${output}"
 		val resourcesToCopy	= resources.*** x rebase(resources, output)
 		val resourcesCopied	= IO copy resourcesToCopy
 		
 		val libDir	= output / "WEB-INF" / "lib"
-		streams.log info ("copying webapp code libraries to " + libDir)
+		streams.log info s"copying webapp code libraries to ${libDir}"
 		libDir.mkdirs()
 		val libsToCopy	=
 				for {
@@ -115,11 +115,11 @@ object WebAppPlugin extends Plugin {
 				yield (source, target)
 		val libsCopied	= IO copy libsToCopy
 		
-		streams.log info ("copying webapp extras to "  + output)
+		streams.log info s"copying webapp extras to ${output}"
 		val extrasToCopy	= extras map { case (file,path) => (file, output / path) }
 		val extrasCopied	= IO copy extrasToCopy
 		
-		streams.log info ("cleaning up")
+		streams.log info "cleaning up"
 		val allFiles	= (output ** (-DirectoryFilter)).get.toSet
 		val obsolete	= allFiles -- resourcesCopied -- dependenciesCopied -- libsCopied -- extrasCopied
 		IO delete obsolete
@@ -147,14 +147,14 @@ object WebAppPlugin extends Plugin {
 		val webappDir	= deployBase1 / deployName
 		val warFile		= deployBase1 / (deployName + ".war")
 		
-		streams.log info ("deleting old war file " + warFile)
+		streams.log info "deleting old war file ${warFile}"
 		IO delete warFile
 		
-		streams.log info ("deleting old webapp " + webappDir)
+		streams.log info "deleting old webapp ${webappDir}"
 		IO delete webappDir
 		
 		val webappFiles	= built.*** x rebase(built, webappDir)
-		streams.log info ("deploying webapp to " + webappDir)
+		streams.log info "deploying webapp to ${webappDir}"
 		IO copy webappFiles
 	}
 }
