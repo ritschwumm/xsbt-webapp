@@ -147,14 +147,14 @@ object WebAppPlugin extends Plugin {
 		val webappDir	= deployBase1 / deployName
 		val warFile		= deployBase1 / (deployName + ".war")
 		
-		streams.log info "deleting old war file ${warFile}"
+		streams.log info s"deleting old war file ${warFile}"
 		IO delete warFile
 		
-		streams.log info "deleting old webapp ${webappDir}"
+		streams.log info s"deleting old webapp ${webappDir}"
 		IO delete webappDir
 		
 		val webappFiles	= built.*** x rebase(built, webappDir)
-		streams.log info "deploying webapp to ${webappDir}"
+		streams.log info s"deploying webapp to ${webappDir}"
 		IO copy webappFiles
 	}
 }
