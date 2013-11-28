@@ -4,9 +4,9 @@ name			:= "xsbt-webapp"
 
 organization	:= "de.djini"
 
-version			:= "0.3.1"
+version			:= "0.4.0"
 
-addSbtPlugin("de.djini" % "xsbt-classpath" % "0.6.0")
+addSbtPlugin("de.djini" % "xsbt-classpath" % "0.7.0")
 
 scalacOptions	++= Seq(
 	"-deprecation",

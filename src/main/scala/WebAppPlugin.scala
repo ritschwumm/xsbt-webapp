@@ -1,6 +1,6 @@
 import sbt._
 
-import Keys.{ Classpath, TaskStreams, sourceDirectory, name, watchSources, update, ivyConfigurations }
+import Keys.{ Classpath, TaskStreams }
 import Project.Initialize
 import classpath.ClasspathUtilities
 
@@ -53,20 +53,20 @@ object WebAppPlugin extends Plugin {
 	
 	lazy val webappSettings:Seq[Def.Setting[_]]	= 
 			classpathSettings ++
-			Seq(
+			Vector(
 				webappBuild				<<= buildTask,
-				webappResources			<<= (sourceDirectory in Compile) { _ / "webapp" },
-				//webappLibraries		<<= update map { _ select configurationFilter("webapp") },
-				webappLibraries			<<= update map { _ matching webappDependencyFilter },
+				webappResources			<<= (Keys.sourceDirectory in Compile) { _ / "webapp" },
+				//webappLibraries		<<= Keys.update map { _ select configurationFilter("webapp") },
+				webappLibraries			<<= Keys.update map { _ matching webappDependencyFilter },
 				webappExtras			:= Seq.empty,
 				webappOutput			<<= Keys.crossTarget { _ / "webapp" },
 				
 				webappDeploy			<<= deployTask,
 				webappDeployBase		:= null,
-				webappDeployName		<<= name,
+				webappDeployName		<<= Keys.name,
 				
-				ivyConfigurations		+= webappConfig,
-				watchSources			<<= (watchSources, webappResources) map { 
+				Keys.ivyConfigurations	+= webappConfig,
+				Keys.watchSources		<<= (Keys.watchSources, webappResources) map { 
 					(watchSources, webappResources) => {
 						val resourceFiles	= webappResources.***.get
 						watchSources ++ resourceFiles
@@ -94,14 +94,17 @@ object WebAppPlugin extends Plugin {
 		extras:Traversable[(File,String)],
 		output:File
 	):File = {
-		streams.log info s"extracting webapp resource libraries to ${output}"
-		val dependenciesCopied	= libraries flatMap { library =>
-			IO unzip (library, output, -(new ExactFilter("META-INF/MANIFEST.MF"))) 
-		}
+		streams.log info s"extracting ${libraries.size} webapp resource libraries to ${output}"
+		val dependenciesCopied	=
+				libraries flatMap { library =>
+					IO unzip (library, output, -(new ExactFilter("META-INF/MANIFEST.MF"))) 
+				}
+		streams.log debug s"extracted ${dependenciesCopied.size} files from webapp resource libraries"
 		
 		streams.log info s"copying webapp resources to ${output}"
 		val resourcesToCopy	= resources.*** x rebase(resources, output)
 		val resourcesCopied	= IO copy resourcesToCopy
+		streams.log debug s"copied ${resourcesCopied.size} files from webapp resources"
 		
 		val libDir	= output / "WEB-INF" / "lib"
 		streams.log info s"copying webapp code libraries to ${libDir}"
@@ -114,15 +117,18 @@ object WebAppPlugin extends Plugin {
 				}
 				yield (source, target)
 		val libsCopied	= IO copy libsToCopy
+		streams.log debug s"copied ${libsToCopy.size} files from webapp code libraries"
 		
 		streams.log info s"copying webapp extras to ${output}"
 		val extrasToCopy	= extras map { case (file,path) => (file, output / path) }
 		val extrasCopied	= IO copy extrasToCopy
+		streams.log debug s"copied ${extrasCopied.size} of ${extrasToCopy.size} files from webapp extras"
 		
 		streams.log info "cleaning up"
 		val allFiles	= (output ** (-DirectoryFilter)).get.toSet
 		val obsolete	= allFiles -- resourcesCopied -- dependenciesCopied -- libsCopied -- extrasCopied
 		IO delete obsolete
+		streams.log debug s"cleaned up ${obsolete.size} obsolete files"
 		
 		output
 	}
