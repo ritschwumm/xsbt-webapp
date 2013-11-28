@@ -54,37 +54,37 @@ object WebAppPlugin extends Plugin {
 	lazy val webappSettings:Seq[Def.Setting[_]]	= 
 			classpathSettings ++
 			Vector(
-				webappBuild				<<= buildTask,
-				webappResources			<<= (Keys.sourceDirectory in Compile) { _ / "webapp" },
-				//webappLibraries		<<= Keys.update map { _ select configurationFilter("webapp") },
-				webappLibraries			<<= Keys.update map { _ matching webappDependencyFilter },
+				webappBuild		:=
+						buildTaskImpl(
+							streams		= Keys.streams.value,
+							assets		= classpathAssets.value,
+							resources	= webappResources.value,
+							libraries	= webappLibraries.value,
+							extras		= webappExtras.value,
+							output		= webappOutput.value
+						),
+				webappResources			:= (Keys.sourceDirectory in Compile).value / "webapp",
+				//webappLibraries		:= Keys.update.value select configurationFilter("webapp"),
+				webappLibraries			:= Keys.update.value matching webappDependencyFilter,
 				webappExtras			:= Seq.empty,
-				webappOutput			<<= Keys.crossTarget { _ / "webapp" },
+				webappOutput			:= Keys.crossTarget.value / "webapp",
 				
-				webappDeploy			<<= deployTask,
+				webappDeploy	:=
+						deployTaskImpl(
+							streams		= Keys.streams.value,
+							built		= webappBuild.value,
+							deployBase	= webappDeployBase.value,
+							deployName	= webappDeployName.value
+						),
 				webappDeployBase		:= null,
-				webappDeployName		<<= Keys.name,
+				webappDeployName		:= Keys.name.value,
 				
 				Keys.ivyConfigurations	+= webappConfig,
-				Keys.watchSources		<<= (Keys.watchSources, webappResources) map { 
-					(watchSources, webappResources) => {
-						val resourceFiles	= webappResources.***.get
-						watchSources ++ resourceFiles
-					}
-				}
+				Keys.watchSources		:= Keys.watchSources.value ++ webappResources.value.***.get
 			)
 	
 	//------------------------------------------------------------------------------
 	//## tasks
-	
-	private def buildTask:Def.Initialize[Task[File]] = (
-		Keys.streams,
-		classpathAssets,
-		webappResources,
-		webappLibraries,
-		webappExtras,
-		webappOutput
-	) map buildTaskImpl
 	
 	private def buildTaskImpl(
 		streams:TaskStreams,	
@@ -132,13 +132,6 @@ object WebAppPlugin extends Plugin {
 		
 		output
 	}
-	
-	private def deployTask:Def.Initialize[Task[Unit]] = (
-		Keys.streams,
-		webappBuild,
-		webappDeployBase,
-		webappDeployName
-	) map deployTaskImpl
 	
 	private def deployTaskImpl(
 		streams:TaskStreams,	
