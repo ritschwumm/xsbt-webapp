@@ -12,7 +12,7 @@ Build and publish the plugin:
     sbt publish-local
     
 Add the plugin to your project in project/plugins.sbt:
-    addSbtPlugin("de.djini" % "xsbt-webapp" % "0.5.0")
+    addSbtPlugin("de.djini" % "xsbt-webapp" % "0.6.0")
     
 Include the plugin in you project's build.sbt:
 
@@ -35,3 +35,21 @@ and add something like this to your build.sbt:
     TaskKey[File]("war")    := (zipperBuild in webappBuild).value
 
 Then run the war task to get a zipped up war file.
+
+Resource libraries can be added like this:
+
+    libraryDependencies += "com.test" % "foobar" % "0.1.0" % "webapp"
+    
+To deploy the webapp to a servlet conttf.e. tomcat, include something like this in the build.sbt:
+    
+    webappDeployName    := "ROOT"
+    
+    webappDeployBase    :=
+            Option(System getenv "CATALINA_HOME")
+            .map        (file)
+            .map        { _ / "webapps" }
+            .filter     { _.isDirectory }
+            
+Then run the webapp-deploy task; it will first delete $CATALINA_HOME/webapps/ROOT 
+and $CATALINA_HOME/webapps/ROOT.war and then copy an exploded webpp directory to 
+$CATALINA_HOME/webapps/ROOT .

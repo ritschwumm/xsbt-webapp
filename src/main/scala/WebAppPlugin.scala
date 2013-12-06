@@ -7,31 +7,10 @@ import classpath.ClasspathUtilities
 import ClasspathPlugin._
 
 object WebAppPlugin extends Plugin {
-	private val configName		= "webapp"
-	private val webappConfig	= config(configName).hide
-	private def webappDependencyFilter	= new DependencyFilter {
-		def apply(configuration:String, module:ModuleID, artifact:Artifact):Boolean	=
-				configuration == configName	&&
-				// TODO check why we have scala-library.jar in the webapp configuration
-				artifact.configurations.nonEmpty
-	}
+	private val webappConfig	= config("webapp").hide
 	
 	//------------------------------------------------------------------------------
 	//## exported
-	
-	/*
-	// add webapp code library
-	libraryDependencies	++= 
-			Seq(
-				"com.test"	% "foobar"	% "0.1.0"	% "webapp"
-			)
-	
-	// use standard tomcat installation
-	webappDeployBase	:=
-			Option(System getenv "CATALINA_HOME") map file map { _ / "webapps" } filter { _.exists } getOrElse (
-				sys error "$CATALINA_HOME is not set or $CATALINA_HOME/webapps does not exist"
-			)
-	*/
 	
 	/** complete build, returns the created directory */
 	val webappBuild				= TaskKey[File]("webapp")
@@ -54,6 +33,8 @@ object WebAppPlugin extends Plugin {
 	lazy val webappSettings:Seq[Def.Setting[_]]	= 
 			classpathSettings ++
 			Vector(
+				Keys.ivyConfigurations	+= webappConfig,
+				
 				webappBuild		:=
 						buildTaskImpl(
 							streams		= Keys.streams.value,
@@ -64,8 +45,7 @@ object WebAppPlugin extends Plugin {
 							output		= webappOutput.value
 						),
 				webappResources			:= (Keys.sourceDirectory in Compile).value / "webapp",
-				//webappLibraries		:= Keys.update.value select configurationFilter("webapp"),
-				webappLibraries			:= Keys.update.value matching webappDependencyFilter,
+				webappLibraries			:= Keys.update.value select configurationFilter(name = webappConfig.name),
 				webappExtras			:= Seq.empty,
 				webappOutput			:= Keys.crossTarget.value / "webapp",
 				
@@ -79,7 +59,6 @@ object WebAppPlugin extends Plugin {
 				webappDeployBase		:= null,
 				webappDeployName		:= Keys.name.value,
 				
-				Keys.ivyConfigurations	+= webappConfig,
 				Keys.watchSources		:= Keys.watchSources.value ++ webappResources.value.***.get
 			)
 	
