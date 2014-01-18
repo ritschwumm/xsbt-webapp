@@ -56,7 +56,7 @@ object WebAppPlugin extends Plugin {
 							deployBase	= webappDeployBase.value,
 							deployName	= webappDeployName.value
 						),
-				webappDeployBase		:= null,
+				webappDeployBase		:= None,
 				webappDeployName		:= Keys.name.value,
 				
 				Keys.watchSources		:= Keys.watchSources.value ++ webappResources.value.***.get
@@ -81,7 +81,7 @@ object WebAppPlugin extends Plugin {
 		streams.log debug s"extracted ${dependenciesCopied.size} files from webapp resource libraries"
 		
 		streams.log info s"copying webapp resources to ${output}"
-		val resourcesToCopy	= resources.*** x rebase(resources, output)
+		val resourcesToCopy	= resources.*** pair rebase(resources, output)
 		val resourcesCopied	= IO copy resourcesToCopy
 		streams.log debug s"copied ${resourcesCopied.size} files from webapp resources"
 		
@@ -131,7 +131,7 @@ object WebAppPlugin extends Plugin {
 		streams.log info s"deleting old webapp ${webappDir}"
 		IO delete webappDir
 		
-		val webappFiles	= built.*** x rebase(built, webappDir)
+		val webappFiles	= built.*** pair rebase(built, webappDir)
 		streams.log info s"deploying webapp to ${webappDir}"
 		IO copy webappFiles
 	}

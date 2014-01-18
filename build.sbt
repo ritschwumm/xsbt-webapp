@@ -4,7 +4,7 @@ name			:= "xsbt-webapp"
 
 organization	:= "de.djini"
 
-version			:= "0.6.0"
+version			:= "0.7.0"
 
 addSbtPlugin("de.djini" % "xsbt-classpath" % "0.8.0")
 
