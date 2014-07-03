@@ -12,30 +12,22 @@ object WebAppPlugin extends Plugin {
 	//------------------------------------------------------------------------------
 	//## exported
 	
-	/** complete build, returns the created directory */
-	val webappBuild				= TaskKey[File]("webapp")
-	/** webapp contents */
-	val webappResources			= SettingKey[File]("webapp-resources")
-	/** library dependencies to include. */
-	val webappLibraries			= TaskKey[Traversable[File]]("webapp-libraries")
-	/** additional resources as a task to allow inclusion of generated content. */
-	val webappExtras			= TaskKey[Traversable[(File,String)]]("webapp-extras")
-	/** where to put the webapp's contents */
-	val webappOutput			= SettingKey[File]("webapp-output")
+	val webapp				= taskKey[File]("complete build, returns the created directory")
+	val webappResources		= settingKey[File]("webapp contents")
+	val webappLibraries		= taskKey[Traversable[File]]("library dependencies to include")
+	val webappExtras		= taskKey[Traversable[(File,String)]]("additional resources as a task to allow inclusion of generated content")
+	val webappOutput		= settingKey[File]("where to put the webapp's contents")
 	
-	/** copy-deploy the webapp */
-	val webappDeploy			= TaskKey[Unit]("webapp-deploy")
-	/** dirname for copy-deploy */
-	val webappDeployBase		= SettingKey[Option[File]]("webapp-deploy-base")
-	/** basename for copy-deploy */
-	val webappDeployName		= SettingKey[String]("webapp-deploy-name")
+	val webappDeploy		= taskKey[Unit]("copy-deploy the webapp")
+	val webappDeployBase	= settingKey[Option[File]]("target directory base for copy-deploy")
+	val webappDeployName	= settingKey[String]("target directory name for copy-deploy")
 	
 	lazy val webappSettings:Seq[Def.Setting[_]]	= 
 			classpathSettings ++
 			Vector(
 				Keys.ivyConfigurations	+= webappConfig,
 				
-				webappBuild		:=
+				webapp	:=
 						buildTaskImpl(
 							streams		= Keys.streams.value,
 							assets		= classpathAssets.value,
@@ -52,7 +44,7 @@ object WebAppPlugin extends Plugin {
 				webappDeploy	:=
 						deployTaskImpl(
 							streams		= Keys.streams.value,
-							built		= webappBuild.value,
+							built		= webapp.value,
 							deployBase	= webappDeployBase.value,
 							deployName	= webappDeployName.value
 						),
