@@ -1,30 +1,23 @@
 import sbt._
 
+import xsbtUtil._
+
+import WebAppPlugin.WebAppProcessor
+
 object WebAppUtil {
-	val manifestFilter	= new ExactFilter("META-INF/MANIFEST.MF")
-	
-	type Pointed	= (File, String)
-	type Cloned		= (File, File)
-	
-	// BETTER this is allSubpaths/selectSubpaths
-	def allPointedIn(sourceDir:File):Traversable[Pointed]	=
-			allDescendants(sourceDir) pair (Path relativeTo sourceDir)
+	def selectiveProcessor(filter:FileFilter)(delegate:WebAppProcessor):WebAppProcessor	= 
+			input => {
+			val (accept, reject)	= input partition (PathMapping.getFile andThen filter.accept)
+				delegate(accept) ++ reject
+			}
+			
+	def filterProcessor(filter:FileFilter):WebAppProcessor	= 
+			_ filter (PathMapping.getFile andThen filter.accept)
 		
-	def allDescendants(sourceDir:File):PathFinder	=
-			sourceDir.*** --- PathFinder(sourceDir)
-	
-	def fileDescendants(sourceDir:File):PathFinder	=
-			(sourceDir ** -DirectoryFilter) --- PathFinder(sourceDir)
-	
-	def copyToBase(sources:Traversable[Pointed], base:File):Set[File]	=
-			IO copy cloneToBase(sources, base)
+	//------------------------------------------------------------------------------
 		
-	def cloneToBase(inputs:Traversable[Pointed], base:File):Traversable[Cloned]	=
-			inputs map cloneTo(base)
-	
-	def cloneTo(base:File)(it:Pointed):Cloned	= 
-			(it._1, base / it._2)
-		
-	// def flatPoint(file:File):(File,String)	=
-			// file -> file.getName
+	def concat(files:Seq[File], to:File) {
+		val string	= files map { IO read (_, IO.utf8) } mkString "\n"
+		IO write (to, string,	IO.utf8)
+	}
 }
