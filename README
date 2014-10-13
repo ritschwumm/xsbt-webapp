@@ -1,4 +1,4 @@
-A minimalistic webapp plugin for sbt
+Another webapp plugin for sbt
 
 To build this code, get and install SBT from 
     https://github.com/sbt/sbt
@@ -17,27 +17,13 @@ Add the plugin to your project in project/plugins.sbt:
     
 Run the webapp task to get a web application directory.
 
-If you need a war file include xsbt-zipper from
-     https://github.com/ritschwumm/xsbt-classpath
-and add something like this to your build.sbt:
-
-    // webapp::zipper
-    inTask(webappBuild)(zipperSettings ++ Seq(
-        zipperFiles     := selectSubpaths(webappBuild.value, AllPassFilter).toSeq,
-        zipperPrefix    := None,
-        zipperExtension := ".war"
-    ))
-    
-    // alias for webapp::zipper
-    TaskKey[File]("war")    := (zipperBuild in webappBuild).value
-
-Then run the war task to get a zipped up war file.
+Then run the webappWar task to get a zipped up war file.
 
 Resource libraries can be added like this:
 
     libraryDependencies += "com.test" % "foobar" % "0.1.0" % "webapp"
     
-To deploy the webapp to a servlet conttf.e. tomcat, include something like this in the build.sbt:
+To deploy the webapp to a servlet container e.g. tomcat, include something like this in the build.sbt:
     
     webappDeployName    := "ROOT"
     
@@ -47,6 +33,6 @@ To deploy the webapp to a servlet conttf.e. tomcat, include something like this 
             .map        { _ / "webapps" }
             .filter     { _.isDirectory }
             
-Then run the webapp-deploy task; it will first delete $CATALINA_HOME/webapps/ROOT 
+Then run the webappDeploy task; it will first delete $CATALINA_HOME/webapps/ROOT 
 and $CATALINA_HOME/webapps/ROOT.war and then copy an exploded webpp directory to 
 $CATALINA_HOME/webapps/ROOT .

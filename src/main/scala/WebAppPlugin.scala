@@ -3,7 +3,9 @@ package xsbtWebApp
 import sbt._
 import Keys.TaskStreams
 
-import xsbtUtil._
+import xsbtUtil.types._
+import xsbtUtil.{ util => xu }
+
 import xsbtClasspath.{ Asset => ClasspathAsset, ClasspathPlugin }
 import xsbtClasspath.Import.classpathAssets
 
@@ -11,7 +13,12 @@ object Import {
 	type WebAppProcessor	= Seq[PathMapping]=>Seq[PathMapping]
 	
 	val webapp				= taskKey[File]("complete build, returns the created directory")
-	val webappOutputDir		= settingKey[File]("where to put the webapp's contents")
+	val webappAppDir		= settingKey[File]("directory of the webapp to be built")
+	
+	val webappWar			= taskKey[File]("complete build, returns the created war file")
+	val webappWarFile		= settingKey[File]("where to put the webapp's war file")
+	
+	val webappPackageName	= settingKey[String]("name of the package built")
 	
 	val webappStage			= taskKey[Seq[PathMapping]]("stage webapp contents for processing")
 	val webappAssetDir		= settingKey[File]("directory with webapp contents")
@@ -29,6 +36,8 @@ object Import {
 	val webappDeploy		= taskKey[Unit]("copy-deploy the webapp")
 	val webappDeployBase	= settingKey[Option[File]]("target directory base for copy-deploy")
 	val webappDeployName	= settingKey[String]("target directory name for copy-deploy")
+
+	val webappBuildDir		= settingKey[File]("base directory of built files")
 }
 
 object WebAppPlugin extends AutoPlugin {
@@ -37,19 +46,19 @@ object WebAppPlugin extends AutoPlugin {
 	//------------------------------------------------------------------------------
 	//## exports
 	
-	override def requires:Plugins		= ClasspathPlugin
-	
-	override def trigger:PluginTrigger	= allRequirements
-	
 	lazy val autoImport	= Import
 	import autoImport._
 	
-	override def projectConfigurations:Seq[Configuration]	=
+	override val requires:Plugins		= ClasspathPlugin && plugins.JvmPlugin
+	
+	override val trigger:PluginTrigger	= noTrigger
+	
+	override lazy val projectConfigurations:Seq[Configuration]	=
 			Vector(
 				webappConfig
 			)
 	
-	override def projectSettings:Seq[Def.Setting[_]]	=
+	override lazy val projectSettings:Seq[Def.Setting[_]]	=
 			Vector(
 				// Keys.ivyConfigurations	+= webappConfig,
 				
@@ -58,14 +67,21 @@ object WebAppPlugin extends AutoPlugin {
 							streams		= Keys.streams.value,
 							assets		= classpathAssets.value,
 							processed	= webappProcess.value,
-							outputDir	= webappOutputDir.value
+							appDir		= webappAppDir.value
 						),
-				webappOutputDir			:= Keys.crossTarget.value / "webapp" / "build",
+				webappAppDir			:= webappBuildDir.value / "output" / webappPackageName.value,
+				webappWar	:=
+						warTask(
+							streams		= Keys.streams.value,
+							webapp		= webapp.value,
+							warFile		= webappWarFile.value
+						),
+				webappWarFile			:= webappBuildDir.value / "output" / (webappPackageName.value + ".war"),
 						
 				webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
-				webappAssets			:= allPathMappingsIn(webappAssetDir.value),
+				webappAssets			:= xu.find allMapped webappAssetDir.value,
 				webappExtras			:= Seq.empty,
-				webappStage				:= webappPrepare.value ++ webappAssets.value.toVector ++	webappExtras.value.toVector,
+				webappStage				:= webappPrepare.value ++ webappAssets.value.toVector ++ webappExtras.value.toVector,
 				webappPrepare	:=
 						prepareTask(
 							streams			= Keys.streams.value,
@@ -73,23 +89,26 @@ object WebAppPlugin extends AutoPlugin {
 							explodeDir		= webappExplodeDir.value
 						),
 				webappDependencies		:= Keys.update.value select configurationFilter(name = webappConfig.name),
-				webappExplodeDir		:= Keys.crossTarget.value / "webapp" / "exploded",
+				webappExplodeDir		:= webappBuildDir.value / "work"/ "explode",
 			
 				webappProcess			:= (webappProcessors.value foldLeft webappStage.value) { (inputs, processor) => processor(inputs) },
 				webappPipeline			:= Vector.empty,
-				webappProcessors		<<= chainTasks(webappPipeline),
+				webappProcessors		<<= xu.task chain webappPipeline,
 				
 				webappDeploy	:=
 						deployTask(
 							streams		= Keys.streams.value,
-							built		= webapp.value,
+							webapp		= webapp.value,
 							deployBase	= webappDeployBase.value,
 							deployName	= webappDeployName.value
 						),
 				webappDeployBase		:= None,
 				webappDeployName		:= Keys.name.value,
 				
-				Keys.watchSources		:= Keys.watchSources.value ++ (webappAssets.value map PathMapping.getFile)
+				webappPackageName		:= Keys.name.value + "-" + Keys.version.value,
+				webappBuildDir			:= Keys.crossTarget.value / "webapp",
+				
+				Keys.watchSources		:= Keys.watchSources.value ++ (webappAssets.value map xu.pathMapping.getFile)
 			)
 			
 	//------------------------------------------------------------------------------
@@ -105,8 +124,8 @@ object WebAppPlugin extends AutoPlugin {
 		IO delete explodeDir
 		dependencies.toVector flatMap { dependency	=>
 			val out	= explodeDir / dependency.getName
-			IO unzip (dependency, out, -JarManifestFilter)
-			allPathMappingsIn(out)
+			IO unzip (dependency, out, -xu.filter.JarManifestFilter)
+			xu.find allMapped out
 		}
 	}
 	
@@ -115,37 +134,51 @@ object WebAppPlugin extends AutoPlugin {
 		streams:TaskStreams,	
 		assets:Seq[ClasspathAsset],
 		processed:Seq[PathMapping],
-		outputDir:File
+		appDir:File
 	):File = {
-		streams.log info s"copying processed resources to ${outputDir}"
-		val resourcesToCopy	= processed map (PathMapping anchorTo outputDir)
+		streams.log info s"copying processed resources to ${appDir}"
+		val resourcesToCopy	= processed map (xu.pathMapping anchorTo appDir)
 		val resourcesCopied	= IO copy resourcesToCopy
 		
-		val libDir	= outputDir / "WEB-INF" / "lib"
+		val libDir	= appDir / "WEB-INF" / "lib"
 		streams.log info s"copying webapp code libraries to ${libDir}"
 		libDir.mkdirs()
-		val libsToCopy	= assets map { _.flatPathMapping } map (PathMapping anchorTo libDir)
+		val libsToCopy	= assets map { _.flatPathMapping } map (xu.pathMapping anchorTo libDir)
 		val libsCopied	= IO copy libsToCopy
 		
 		streams.log info "cleaning up"
 		// NOTE we should delete not-copied directories,
 		// but at least for libs we don't have the copied ones
-		val allFiles	= filesIn(outputDir).toSet
+		val allFiles	= (xu.find files appDir).toSet
 		val obsolete	= allFiles -- resourcesCopied -- libsCopied
 		IO delete obsolete
 		
-		outputDir
+		appDir
+	}
+	
+	/** build webapp war */
+	private def warTask(
+		streams:TaskStreams,	
+		webapp:File,
+		warFile:File
+	):File = {
+		streams.log info s"creating war file ${warFile}"
+		xu.zip create (
+			sources		= xu.find allMapped webapp,
+			outputZip	= warFile
+		)
+		warFile
 	}
 	
 	/** copy-deploy webapp */
 	private def deployTask(
 		streams:TaskStreams,	
-		built:File,
+		webapp:File,
 		deployBase:Option[File],
 		deployName:String
 	):Unit = {
 		if (deployBase.isEmpty) {
-			failWithError(streams, s"${webappDeployBase.key.label} must be initialized to deploy")
+			xu.fail logging (streams, s"${webappDeployBase.key.label} must be initialized to deploy")
 		}
 		val deployBase1	= deployBase.get
 		
@@ -159,7 +192,7 @@ object WebAppPlugin extends AutoPlugin {
 		IO delete webappDir
 		
 		streams.log info s"deploying webapp to ${webappDir}"
-		val webappFiles	= allPathMappingsIn(built) map (PathMapping anchorTo webappDir)
+		val webappFiles	= (xu.find allMapped webapp) map (xu.pathMapping anchorTo webappDir)
 		IO copy webappFiles
 	}
 }
