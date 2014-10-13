@@ -1,20 +1,14 @@
+package xsbtWebApp
+
 import sbt._
+import Keys.TaskStreams
 
-import Keys.{ Classpath, TaskStreams }
-import Project.Initialize
-import classpath.ClasspathUtilities
-
-import ClasspathPlugin._
-import WebAppUtil._
 import xsbtUtil._
+import xsbtClasspath.{ Asset => ClasspathAsset, ClasspathPlugin }
+import xsbtClasspath.Import.classpathAssets
 
-object WebAppPlugin extends Plugin {
-	private val webappConfig	= config("webapp").hide
-	
-	type WebAppProcessor		= Seq[PathMapping]=>Seq[PathMapping]
-	
-	//------------------------------------------------------------------------------
-	//## exported
+object Import {
+	type WebAppProcessor	= Seq[PathMapping]=>Seq[PathMapping]
 	
 	val webapp				= taskKey[File]("complete build, returns the created directory")
 	val webappOutputDir		= settingKey[File]("where to put the webapp's contents")
@@ -35,11 +29,29 @@ object WebAppPlugin extends Plugin {
 	val webappDeploy		= taskKey[Unit]("copy-deploy the webapp")
 	val webappDeployBase	= settingKey[Option[File]]("target directory base for copy-deploy")
 	val webappDeployName	= settingKey[String]("target directory name for copy-deploy")
+}
+
+object WebAppPlugin extends AutoPlugin {
+	val webappConfig		= config("webapp").hide
 	
-	lazy val webappSettings:Seq[Def.Setting[_]]	= 
-			classpathSettings ++
+	//------------------------------------------------------------------------------
+	//## exports
+	
+	override def requires:Plugins		= ClasspathPlugin
+	
+	override def trigger:PluginTrigger	= allRequirements
+	
+	lazy val autoImport	= Import
+	import autoImport._
+	
+	override def projectConfigurations:Seq[Configuration]	=
 			Vector(
-				Keys.ivyConfigurations	+= webappConfig,
+				webappConfig
+			)
+	
+	override def projectSettings:Seq[Def.Setting[_]]	=
+			Vector(
+				// Keys.ivyConfigurations	+= webappConfig,
 				
 				webapp	:=
 						buildTask(
@@ -51,21 +63,9 @@ object WebAppPlugin extends Plugin {
 				webappOutputDir			:= Keys.crossTarget.value / "webapp" / "build",
 						
 				webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
-				webappAssets			:=
-						assetsTask(
-							streams		= Keys.streams.value,
-							assetDir	= webappAssetDir.value
-						),
-				
+				webappAssets			:= allPathMappingsIn(webappAssetDir.value),
 				webappExtras			:= Seq.empty,
-				webappStage	:=
-						stageTask(
-							streams		= Keys.streams.value,
-							assets		= webappAssets.value,
-							prepared	= webappPrepare.value,
-							extras		= webappExtras.value
-						),
-			
+				webappStage				:= webappPrepare.value ++ webappAssets.value.toVector ++	webappExtras.value.toVector,
 				webappPrepare	:=
 						prepareTask(
 							streams			= Keys.streams.value,
@@ -75,14 +75,9 @@ object WebAppPlugin extends Plugin {
 				webappDependencies		:= Keys.update.value select configurationFilter(name = webappConfig.name),
 				webappExplodeDir		:= Keys.crossTarget.value / "webapp" / "exploded",
 			
-				webappProcess	:=
-						processTask(
-							streams		= Keys.streams.value,
-							staged		= webappStage.value,
-							processors	= webappProcessors.value
-						),
+				webappProcess			:= (webappProcessors.value foldLeft webappStage.value) { (inputs, processor) => processor(inputs) },
 				webappPipeline			:= Vector.empty,
-				webappProcessors		<<= pipelineTask(webappPipeline),
+				webappProcessors		<<= chainTasks(webappPipeline),
 				
 				webappDeploy	:=
 						deployTask(
@@ -100,14 +95,6 @@ object WebAppPlugin extends Plugin {
 	//------------------------------------------------------------------------------
 	//## tasks
 	
-	/** find assets for processing */
-	private def assetsTask(
-		streams:TaskStreams,
-		assetDir:File
-	):Traversable[PathMapping]	= {
-		allPathMappingsIn(assetDir)
-	}
-						
 	/** prepare dependencies for processing */
 	private def prepareTask(
 		streams:TaskStreams,
@@ -120,36 +107,6 @@ object WebAppPlugin extends Plugin {
 			val out	= explodeDir / dependency.getName
 			IO unzip (dependency, out, -JarManifestFilter)
 			allPathMappingsIn(out)
-		}
-	}
-	
-	/** stage all inputs for processing */
-	private def stageTask(
-		streams:TaskStreams,
-		assets:Traversable[PathMapping],
-		prepared:Seq[PathMapping],
-		extras:Traversable[PathMapping]
-	):Seq[PathMapping]	= {
-		streams.log info s"staging assets, libraries and extras"
-		prepared		++
-		assets.toVector	++
-		extras.toVector
-	}
-	
-	/** merge pipeline into a simple processor */
-	private def pipelineTask(
-		processorsKey:SettingKey[Seq[TaskKey[WebAppProcessor]]]
-	):Def.Initialize[Task[Seq[WebAppProcessor]]]	=
-			chainTasks(processorsKey)
-	
-	/** process inputs */
-	private def processTask(
-		streams:TaskStreams,
-		staged:Seq[PathMapping],
-		processors:Seq[WebAppProcessor]
-	):Seq[PathMapping]	= {
-		(processors foldLeft staged) { (inputs, processor) =>
-			processor(inputs) 
 		}
 	}
 	

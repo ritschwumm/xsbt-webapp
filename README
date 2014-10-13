@@ -15,10 +15,6 @@ Build and publish the plugin:
 Add the plugin to your project in project/plugins.sbt:
     addSbtPlugin("de.djini" % "xsbt-webapp" % <version>)
     
-Include the plugin in your project's build.sbt:
-
-    webappSettings
-    
 Run the webapp task to get a web application directory.
 
 If you need a war file include xsbt-zipper from
