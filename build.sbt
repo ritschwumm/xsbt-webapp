@@ -4,7 +4,7 @@ name			:= "xsbt-webapp"
 
 organization	:= "de.djini"
 
-version			:= "1.2.0"
+version			:= "1.3.0"
 
 scalacOptions	++= Seq(
 	"-deprecation",
@@ -18,6 +18,8 @@ scalacOptions	++= Seq(
 	// "-language:experimental.macros"
 	"-feature"
 )
+
+conflictManager	:= ConflictManager.strict
 
 addSbtPlugin("de.djini" % "xsbt-util"		% "0.2.0")
 

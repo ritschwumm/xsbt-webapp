@@ -10,7 +10,8 @@ import xsbtClasspath.{ Asset => ClasspathAsset, ClasspathPlugin }
 import xsbtClasspath.Import.classpathAssets
 
 object Import {
-	type WebAppProcessor	= Seq[PathMapping]=>Seq[PathMapping]
+	type WebAppProcessor	= xsbtWebApp.WebAppProcessor
+	val WebAppProcessor		= xsbtWebApp.WebAppProcessor
 	
 	val webapp				= taskKey[File]("complete build, returns the created directory")
 	val webappAppDir		= settingKey[File]("directory of the webapp to be built")
