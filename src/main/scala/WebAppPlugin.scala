@@ -11,7 +11,7 @@ import xsbtClasspath.Import.classpathAssets
 
 object Import {
 	type WebAppProcessor	= xsbtWebApp.WebAppProcessor
-	val WebAppProcessor		= xsbtWebApp.WebAppProcessor
+	val WebAppProcessor		= xsbtWebApp.WebAppProcessors
 	
 	val webapp				= taskKey[File]("complete build, returns the created directory")
 	val webappAppDir		= settingKey[File]("directory of the webapp to be built")
@@ -122,12 +122,17 @@ object WebAppPlugin extends AutoPlugin {
 		explodeDir:File
 	):Seq[PathMapping]	= {
 		streams.log info s"extracting ${dependencies.size} webapp content libraries to ${explodeDir}"
-		IO delete explodeDir
-		dependencies.toVector flatMap { dependency	=>
-			val out	= explodeDir / dependency.getName
-			IO unzip (dependency, out, -xu.filter.JarManifestFilter)
-			xu.find allMapped out
-		}
+		val exploded	= 
+				dependencies.toVector flatMap { dependency	=>
+					val out	= explodeDir / dependency.getName
+					IO unzip (dependency, out, -xu.filter.JarManifestFilter)
+					xu.find allMapped out
+				}
+				
+		streams.log info s"cleaning up ${explodeDir}"
+		val explodedFiles	= (exploded map { xu.pathMapping.getFile }).toSet
+		xu.file cleanupDir (explodeDir, explodedFiles)
+		exploded
 	}
 	
 	/** build webapp directory */
@@ -147,12 +152,8 @@ object WebAppPlugin extends AutoPlugin {
 		val libsToCopy	= assets map { _.flatPathMapping } map (xu.pathMapping anchorTo libDir)
 		val libsCopied	= IO copy libsToCopy
 		
-		streams.log info "cleaning up"
-		// NOTE we should delete not-copied directories,
-		// but at least for libs we don't have the copied ones
-		val allFiles	= (xu.find files appDir).toSet
-		val obsolete	= allFiles -- resourcesCopied -- libsCopied
-		IO delete obsolete
+		streams.log info s"cleaning up ${appDir}"
+		xu.file cleanupDir (appDir, resourcesCopied ++ libsCopied)
 		
 		appDir
 	}
@@ -189,11 +190,12 @@ object WebAppPlugin extends AutoPlugin {
 		streams.log info s"deleting old war file ${warFile}"
 		IO delete warFile
 		
-		streams.log info s"deleting old webapp ${webappDir}"
-		IO delete webappDir
-		
 		streams.log info s"deploying webapp to ${webappDir}"
-		val webappFiles	= (xu.find allMapped webapp) map (xu.pathMapping anchorTo webappDir)
-		IO copy webappFiles
+		val webappFiles		= (xu.find allMapped webapp) map (xu.pathMapping anchorTo webappDir)
+		val webappCopied	= IO copy webappFiles
+		
+		streams.log info s"cleaning up webapp in ${webappDir}"
+		xu.file cleanupDir (webappDir, webappCopied)
+
 	}
 }
