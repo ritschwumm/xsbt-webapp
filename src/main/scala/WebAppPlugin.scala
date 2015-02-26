@@ -196,6 +196,5 @@ object WebAppPlugin extends AutoPlugin {
 		
 		streams.log info s"cleaning up webapp in ${webappDir}"
 		xu.file cleanupDir (webappDir, webappCopied)
-
 	}
 }
