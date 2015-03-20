@@ -122,7 +122,7 @@ object WebAppPlugin extends AutoPlugin {
 		explodeDir:File
 	):Seq[PathMapping]	= {
 		streams.log info s"extracting ${dependencies.size} webapp content libraries to ${explodeDir}"
-		val exploded	= 
+		val exploded	=
 				dependencies.toVector flatMap { dependency	=>
 					val out	= explodeDir / dependency.getName
 					IO unzip (dependency, out, -xu.filter.JarManifestFilter)
