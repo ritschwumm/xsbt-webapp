@@ -90,7 +90,7 @@ object WebAppPlugin extends AutoPlugin {
 							explodeDir		= webappExplodeDir.value
 						),
 				webappDependencies		:= Keys.update.value select configurationFilter(name = webappConfig.name),
-				webappExplodeDir		:= webappBuildDir.value / "work"/ "explode",
+				webappExplodeDir		:= webappBuildDir.value / "explode",
 			
 				webappProcess			:= (webappProcessors.value foldLeft webappStage.value) { (inputs, processor) => processor(inputs) },
 				webappPipeline			:= Vector.empty,
@@ -109,8 +109,13 @@ object WebAppPlugin extends AutoPlugin {
 				webappPackageName		:= Keys.name.value + "-" + Keys.version.value,
 				webappBuildDir			:= Keys.crossTarget.value / "webapp",
 				
-				Keys.watchSources		:= Keys.watchSources.value ++ (webappAssets.value map xu.pathMapping.getFile)
-			)
+				Keys.watchSources		:= Keys.watchSources.value ++ (webappAssets.value map xu.pathMapping.getFile),
+				
+				Keys.artifact in (Compile, webappWar) ~= {
+					_ copy (`type` = "war", extension = "war")
+				}
+			) ++
+			addArtifact(Keys.artifact in (Compile, webappWar), webappWar)
 			
 	//------------------------------------------------------------------------------
 	//## tasks
