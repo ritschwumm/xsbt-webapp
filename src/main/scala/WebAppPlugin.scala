@@ -13,9 +13,6 @@ import xsbtClasspath.{ Asset => ClasspathAsset, ClasspathPlugin }
 import xsbtClasspath.Import.classpathAssets
 
 object Import {
-	type WebAppProcessor	= xsbtWebApp.WebAppProcessor
-	val WebAppProcessor		= xsbtWebApp.WebAppProcessors
-	
 	val webapp				= taskKey[File]("complete build, returns the created directory")
 	val webappAppDir		= settingKey[File]("directory of the webapp to be built")
 	
@@ -24,18 +21,10 @@ object Import {
 	
 	val webappPackageName	= settingKey[String]("name of the package built")
 	
-	val webappStage			= taskKey[Seq[PathMapping]]("stage webapp contents for processing")
+	val webappStage			= taskKey[Seq[PathMapping]]("gathered webapp assets")
 	val webappAssetDir		= settingKey[File]("directory with webapp contents")
 	val webappAssets		= taskKey[Traversable[PathMapping]]("webapp contents")
-	val webappExtras		= taskKey[Traversable[PathMapping]]("additional webapp contents for as a task to allow inclusion of generated content")
-	
-	val webappPrepare		= taskKey[Seq[PathMapping]]("prepare libraries for processing")
-	val webappDependencies	= taskKey[Seq[File]]("additional webapp contents as dependencies")
-	val webappExplodeDir	= settingKey[File]("a place to unpack webappDependencies")
-	
-	val webappProcess		= taskKey[Seq[PathMapping]]("process staged webapp contents")
-	val webappPipeline		= settingKey[Seq[TaskKey[WebAppProcessor]]]("pipeline applied to webapp contents")
-	val webappProcessors	= taskKey[Seq[WebAppProcessor]]("processors applied to webapp contents")
+	val webappExtras		= taskKey[Traversable[PathMapping]]("additional webapp contents+")
 	
 	val webappDeploy		= taskKey[Unit]("copy-deploy the webapp")
 	val webappDeployBase	= settingKey[Option[File]]("target directory base for copy-deploy")
@@ -45,8 +34,6 @@ object Import {
 }
 
 object WebAppPlugin extends AutoPlugin {
-	val webappConfig		= config("webapp").hide
-	
 	//------------------------------------------------------------------------------
 	//## exports
 	
@@ -57,23 +44,22 @@ object WebAppPlugin extends AutoPlugin {
 	
 	override val trigger:PluginTrigger	= noTrigger
 	
-	override lazy val projectConfigurations:Seq[Configuration]	=
-			Vector(
-				webappConfig
-			)
-	
 	override lazy val projectSettings:Seq[Def.Setting[_]]	=
 			Vector(
-				// Keys.ivyConfigurations	+= webappConfig,
-				
 				webapp	:=
 						buildTask(
-							streams		= Keys.streams.value,
-							assets		= classpathAssets.value,
-							processed	= webappProcess.value,
-							appDir		= webappAppDir.value
+							streams	= Keys.streams.value,
+							libs	= classpathAssets.value,
+							assets	= webappStage.value,
+							appDir	= webappAppDir.value
 						),
 				webappAppDir			:= webappBuildDir.value / "output" / webappPackageName.value,
+				
+				webappStage				:= webappAssets.value.toVector ++ webappExtras.value.toVector,
+				webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
+				webappAssets			:= xu.find allMapped webappAssetDir.value,
+				webappExtras			:= Seq.empty,
+				
 				webappWar	:=
 						warTask(
 							streams		= Keys.streams.value,
@@ -82,23 +68,6 @@ object WebAppPlugin extends AutoPlugin {
 						),
 				webappWarFile			:= webappBuildDir.value / "output" / (webappPackageName.value + ".war"),
 						
-				webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
-				webappAssets			:= xu.find allMapped webappAssetDir.value,
-				webappExtras			:= Seq.empty,
-				webappStage				:= webappPrepare.value ++ webappAssets.value.toVector ++ webappExtras.value.toVector,
-				webappPrepare	:=
-						prepareTask(
-							streams			= Keys.streams.value,
-							dependencies	= webappDependencies.value,
-							explodeDir		= webappExplodeDir.value
-						),
-				webappDependencies		:= Keys.update.value select configurationFilter(name = webappConfig.name),
-				webappExplodeDir		:= webappBuildDir.value / "explode",
-			
-				webappProcess			:= (webappProcessors.value foldLeft webappStage.value) { (inputs, processor) => processor(inputs) },
-				webappPipeline			:= Vector.empty,
-				webappProcessors		<<= xu.task chain webappPipeline,
-				
 				webappDeploy	:=
 						deployTask(
 							streams		= Keys.streams.value,
@@ -161,45 +130,25 @@ object WebAppPlugin extends AutoPlugin {
 	//------------------------------------------------------------------------------
 	//## tasks
 	
-	/** prepare dependencies for processing */
-	private def prepareTask(
-		streams:TaskStreams,
-		dependencies:Traversable[File],
-		explodeDir:File
-	):Seq[PathMapping]	= {
-		streams.log info s"extracting ${dependencies.size} webapp content libraries to ${explodeDir}"
-		val exploded	=
-				dependencies.toVector flatMap { dependency	=>
-					val out	= explodeDir / dependency.getName
-					IO unzip (dependency, out, -xu.filter.JarManifestFilter)
-					xu.find allMapped out
-				}
-				
-		streams.log info s"cleaning up ${explodeDir}"
-		val explodedFiles	= (exploded map { xu.pathMapping.getFile }).toSet
-		xu.file cleanupDir (explodeDir, explodedFiles)
-		exploded
-	}
-	
 	/** build webapp directory */
 	private def buildTask(
 		streams:TaskStreams,	
-		assets:Seq[ClasspathAsset],
-		processed:Seq[PathMapping],
+		libs:Seq[ClasspathAsset],
+		assets:Seq[PathMapping],
 		appDir:File
 	):File = {
-		streams.log info s"copying processed resources to ${appDir}"
-		val resourcesToCopy	= processed map (xu.pathMapping anchorTo appDir)
-		val resourcesCopied	= IO copy resourcesToCopy
+		streams.log info s"copying resources to ${appDir}"
+		val assetsToCopy	= assets map (xu.pathMapping anchorTo appDir)
+		val assetsCopied	= IO copy assetsToCopy
 		
 		val libDir	= appDir / "WEB-INF" / "lib"
-		streams.log info s"copying webapp code libraries to ${libDir}"
+		streams.log info s"copying libraries to ${libDir}"
 		libDir.mkdirs()
-		val libsToCopy	= assets map { _.flatPathMapping } map (xu.pathMapping anchorTo libDir)
+		val libsToCopy	= libs map { _.flatPathMapping } map (xu.pathMapping anchorTo libDir)
 		val libsCopied	= IO copy libsToCopy
 		
 		streams.log info s"cleaning up ${appDir}"
-		xu.file cleanupDir (appDir, resourcesCopied ++ libsCopied)
+		xu.file cleanupDir (appDir, assetsCopied ++ libsCopied)
 		
 		appDir
 	}
