@@ -1,5 +1,8 @@
 package xsbtWebApp
 
+import scala.xml.{ Node => XmlNode, NodeSeq => XmlNodeSeq, _ }
+import scala.xml.transform.{ RewriteRule, RuleTransformer }
+
 import sbt._
 import Keys.TaskStreams
 
@@ -111,7 +114,7 @@ object WebAppPlugin extends AutoPlugin {
 				
 				Keys.watchSources		:= Keys.watchSources.value ++ (webappAssets.value map xu.pathMapping.getFile),
 				
-				// disable standard artifact, xsbt-webapp published webappWar
+				// disable standard artifact, xsbt-webapp publishes webappWar
 				Keys.publishArtifact in (Compile, Keys.packageBin) := false,
 				
 				// add war artifact
@@ -127,9 +130,6 @@ object WebAppPlugin extends AutoPlugin {
 	//------------------------------------------------------------------------------
 	//## pom transformation
 	
-	import scala.xml.{ Node => XmlNode, NodeSeq => XmlNodeSeq, _ }
-	import scala.xml.transform.{ RewriteRule, RuleTransformer }
-			
 	private def removeDependencies(node:XmlNode):XmlNode	=
 			(new RuleTransformer(pomRewriteRule) transform node).head
 		
@@ -144,16 +144,18 @@ object WebAppPlugin extends AutoPlugin {
 								val scope			= childText(el, "scope")
 								Comment(s"$organization#$artifact;$version ($scope)")
 							case el:Elem if el.label == "repository" =>	
+								/*
 								val id		= childText(el, "id")
 								val name	= childText(el, "name")
 								val url		= childText(el, "url")
 								val layout	= childText(el, "layout")
+								*/
 								Comment(s"redacted")
 							case _ =>
 								node
 						}
 				private def childText(el:Elem, label:String):String	=
-						(el.child filter { _.label == label } flatMap { _.text }).mkString
+						el.child filter { _.label == label } flatMap { _.text } mkString ""
 			}
 	
 	//------------------------------------------------------------------------------
