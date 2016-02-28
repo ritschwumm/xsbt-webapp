@@ -137,19 +137,9 @@ object WebAppPlugin extends AutoPlugin {
 		assets:Seq[PathMapping],
 		appDir:File
 	):File = {
-		streams.log info s"copying resources to ${appDir}"
-		val assetsToCopy	= assets map (xu.pathMapping anchorTo appDir)
-		val assetsCopied	= IO copy assetsToCopy
-		
-		val libDir	= appDir / "WEB-INF" / "lib"
-		streams.log info s"copying libraries to ${libDir}"
-		libDir.mkdirs()
-		val libsToCopy	= libs map { _.flatPathMapping } map (xu.pathMapping anchorTo libDir)
-		val libsCopied	= IO copy libsToCopy
-		
-		streams.log info s"cleaning up ${appDir}"
-		xu.file cleanupDir (appDir, assetsCopied ++ libsCopied)
-		
+		streams.log info s"copying resources and libraries to ${appDir}"
+		val libsToCopy	= libs map { _.flatPathMapping } map (xu.pathMapping modifyPath ("WEB-INF/lib/" + _))
+		xu.file mirror (appDir, assets ++ libsToCopy)
 		appDir
 	}
 	
@@ -186,10 +176,7 @@ object WebAppPlugin extends AutoPlugin {
 		IO delete warFile
 		
 		streams.log info s"deploying webapp to ${webappDir}"
-		val webappFiles		= (xu.find allMapped webapp) map (xu.pathMapping anchorTo webappDir)
-		val webappCopied	= IO copy webappFiles
-		
-		streams.log info s"cleaning up webapp in ${webappDir}"
-		xu.file cleanupDir (webappDir, webappCopied)
+		val webappFiles		= xu.find allMapped webapp
+		xu.file mirror (webappDir, webappFiles)
 	}
 }
