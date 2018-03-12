@@ -81,14 +81,14 @@ object WebAppPlugin extends AutoPlugin {
 				webappPackageName		:= Keys.name.value + "-" + Keys.version.value,
 				webappBuildDir			:= Keys.crossTarget.value / "webapp",
 				
-				Keys.watchSources		:= Keys.watchSources.value ++ (webappAssets.value map xu.pathMapping.getFile),
+				Keys.watchSources		:= Keys.watchSources.value :+ WatchSource(webappAssetDir.value),
 				
 				// disable standard artifact, xsbt-webapp publishes webappWar
 				Keys.publishArtifact in (Compile, Keys.packageBin) := false,
 				
 				// add war artifact
 				Keys.artifact in (Compile, webappWar) ~= {
-					_ copy (`type` = "war", extension = "war")
+					_ withType "war" withExtension "war"
 				},
 				
 				// remove dependencies and repositories from pom
