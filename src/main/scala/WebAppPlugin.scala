@@ -15,17 +15,17 @@ import xsbtClasspath.Import.classpathAssets
 object Import {
 	val webapp				= taskKey[File]("complete build, returns the created directory")
 	val webappAppDir		= settingKey[File]("directory of the webapp to be built")
-	
+
 	val webappWar			= taskKey[File]("complete build, returns the created war file")
 	val webappWarFile		= settingKey[File]("where to put the webapp's war file")
-	
+
 	val webappPackageName	= settingKey[String]("name of the package built")
-	
+
 	val webappStage			= taskKey[Seq[PathMapping]]("gathered webapp assets")
 	val webappAssetDir		= settingKey[File]("directory with webapp contents")
 	val webappAssets		= taskKey[Traversable[PathMapping]]("webapp contents")
 	val webappExtras		= taskKey[Traversable[PathMapping]]("additional webapp contents+")
-	
+
 	val webappDeploy		= taskKey[Unit]("copy-deploy the webapp")
 	val webappDeployBase	= settingKey[Option[File]]("target directory base for copy-deploy")
 	val webappDeployName	= settingKey[String]("target directory name for copy-deploy")
@@ -36,14 +36,14 @@ object Import {
 object WebAppPlugin extends AutoPlugin {
 	//------------------------------------------------------------------------------
 	//## exports
-	
+
 	lazy val autoImport	= Import
 	import autoImport._
-	
+
 	override val requires:Plugins		= ClasspathPlugin && plugins.JvmPlugin
-	
+
 	override val trigger:PluginTrigger	= noTrigger
-	
+
 	override lazy val projectSettings:Seq[Def.Setting[_]]	=
 			Vector(
 				webapp	:=
@@ -54,12 +54,12 @@ object WebAppPlugin extends AutoPlugin {
 							appDir	= webappAppDir.value
 						),
 				webappAppDir			:= webappBuildDir.value / "output" / webappPackageName.value,
-				
+
 				webappStage				:= webappAssets.value.toVector ++ webappExtras.value.toVector,
 				webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
 				webappAssets			:= xu.find allMapped webappAssetDir.value,
 				webappExtras			:= Seq.empty,
-				
+
 				webappWar	:=
 						warTask(
 							streams		= Keys.streams.value,
@@ -67,7 +67,7 @@ object WebAppPlugin extends AutoPlugin {
 							warFile		= webappWarFile.value
 						),
 				webappWarFile			:= webappBuildDir.value / "output" / (webappPackageName.value + ".war"),
-						
+
 				webappDeploy	:=
 						deployTask(
 							streams		= Keys.streams.value,
@@ -77,20 +77,20 @@ object WebAppPlugin extends AutoPlugin {
 						),
 				webappDeployBase		:= None,
 				webappDeployName		:= Keys.name.value,
-				
+
 				webappPackageName		:= Keys.name.value + "-" + Keys.version.value,
 				webappBuildDir			:= Keys.crossTarget.value / "webapp",
-				
+
 				Keys.watchSources		:= Keys.watchSources.value :+ WatchSource(webappAssetDir.value),
-				
+
 				// disable standard artifact, xsbt-webapp publishes webappWar
 				Keys.publishArtifact in (Compile, Keys.packageBin) := false,
-				
+
 				// add war artifact
 				Keys.artifact in (Compile, webappWar) ~= {
 					_ withType "war" withExtension "war"
 				},
-				
+
 				// remove dependencies and repositories from pom
 				Keys.pomPostProcess		:= removeDependencies
 			) ++
@@ -98,21 +98,21 @@ object WebAppPlugin extends AutoPlugin {
 
 	//------------------------------------------------------------------------------
 	//## pom transformation
-	
+
 	private def removeDependencies(node:XmlNode):XmlNode	=
 			(new RuleTransformer(pomRewriteRule) transform node).head
-		
+
 	private val pomRewriteRule	=
 			new RewriteRule {
 				override def transform(node:XmlNode):XmlNodeSeq =
 						node match {
-							case el:Elem if el.label == "dependency" =>	
+							case el:Elem if el.label == "dependency" =>
 								val organization	= childText(el, "groupId")
 								val artifact		= childText(el, "artifactId")
 								val version			= childText(el, "version")
 								val scope			= childText(el, "scope")
 								Comment(s"$organization#$artifact;$version ($scope)")
-							case el:Elem if el.label == "repository" =>	
+							case el:Elem if el.label == "repository" =>
 								/*
 								val id		= childText(el, "id")
 								val name	= childText(el, "name")
@@ -126,13 +126,13 @@ object WebAppPlugin extends AutoPlugin {
 				private def childText(el:Elem, label:String):String	=
 						el.child filter { _.label == label } flatMap { _.text } mkString ""
 			}
-	
+
 	//------------------------------------------------------------------------------
 	//## tasks
-	
+
 	/** build webapp directory */
 	private def buildTask(
-		streams:TaskStreams,	
+		streams:TaskStreams,
 		libs:Seq[ClasspathAsset],
 		assets:Seq[PathMapping],
 		appDir:File
@@ -142,10 +142,10 @@ object WebAppPlugin extends AutoPlugin {
 		xu.file mirror (appDir, assets ++ libsToCopy)
 		appDir
 	}
-	
+
 	/** build webapp war */
 	private def warTask(
-		streams:TaskStreams,	
+		streams:TaskStreams,
 		webapp:File,
 		warFile:File
 	):File = {
@@ -156,10 +156,10 @@ object WebAppPlugin extends AutoPlugin {
 		)
 		warFile
 	}
-	
+
 	/** copy-deploy webapp */
 	private def deployTask(
-		streams:TaskStreams,	
+		streams:TaskStreams,
 		webapp:File,
 		deployBase:Option[File],
 		deployName:String
@@ -168,13 +168,13 @@ object WebAppPlugin extends AutoPlugin {
 			xu.fail logging (streams, s"${webappDeployBase.key.label} must be initialized to deploy")
 		}
 		val deployBase1	= deployBase.get
-		
+
 		val webappDir	= deployBase1 / deployName
 		val warFile		= deployBase1 / (deployName + ".war")
-		
+
 		streams.log info s"deleting old war file ${warFile}"
 		IO delete warFile
-		
+
 		streams.log info s"deploying webapp to ${webappDir}"
 		val webappFiles		= xu.find allMapped webapp
 		xu.file mirror (webappDir, webappFiles)
