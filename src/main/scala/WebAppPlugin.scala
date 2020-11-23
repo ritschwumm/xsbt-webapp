@@ -45,56 +45,56 @@ object WebAppPlugin extends AutoPlugin {
 	override val trigger:PluginTrigger	= noTrigger
 
 	override lazy val projectSettings:Seq[Def.Setting[_]]	=
-			Vector(
-				webapp	:=
-						buildTask(
-							streams	= Keys.streams.value,
-							libs	= classpathAssets.value,
-							assets	= webappStage.value,
-							appDir	= webappAppDir.value
-						),
-				webappAppDir			:= webappBuildDir.value / "output" / webappPackageName.value,
+		Vector(
+			webapp	:=
+				buildTask(
+					streams	= Keys.streams.value,
+					libs	= classpathAssets.value,
+					assets	= webappStage.value,
+					appDir	= webappAppDir.value
+				),
+			webappAppDir			:= webappBuildDir.value / "output" / webappPackageName.value,
 
-				webappStage				:= webappAssets.value.toVector ++ webappExtras.value.toVector,
-				webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
-				webappAssets			:= xu.find allMapped webappAssetDir.value,
-				webappExtras			:= Seq.empty,
+			webappStage				:= webappAssets.value.toVector ++ webappExtras.value.toVector,
+			webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
+			webappAssets			:= xu.find allMapped webappAssetDir.value,
+			webappExtras			:= Seq.empty,
 
-				webappWar	:=
-						warTask(
-							streams		= Keys.streams.value,
-							webapp		= webapp.value,
-							warFile		= webappWarFile.value
-						),
-				webappWarFile			:= webappBuildDir.value / "output" / (webappPackageName.value + ".war"),
+			webappWar	:=
+				warTask(
+					streams		= Keys.streams.value,
+					webapp		= webapp.value,
+					warFile		= webappWarFile.value
+				),
+			webappWarFile			:= webappBuildDir.value / "output" / (webappPackageName.value + ".war"),
 
-				webappDeploy	:=
-						deployTask(
-							streams		= Keys.streams.value,
-							webapp		= webapp.value,
-							deployBase	= webappDeployBase.value,
-							deployName	= webappDeployName.value
-						),
-				webappDeployBase		:= None,
-				webappDeployName		:= Keys.name.value,
+			webappDeploy	:=
+				deployTask(
+					streams		= Keys.streams.value,
+					webapp		= webapp.value,
+					deployBase	= webappDeployBase.value,
+					deployName	= webappDeployName.value
+				),
+			webappDeployBase		:= None,
+			webappDeployName		:= Keys.name.value,
 
-				webappPackageName		:= Keys.name.value + "-" + Keys.version.value,
-				webappBuildDir			:= Keys.crossTarget.value / "webapp",
+			webappPackageName		:= Keys.name.value + "-" + Keys.version.value,
+			webappBuildDir			:= Keys.crossTarget.value / "webapp",
 
-				Keys.watchSources		:= Keys.watchSources.value :+ WatchSource(webappAssetDir.value),
+			Keys.watchSources		:= Keys.watchSources.value :+ WatchSource(webappAssetDir.value),
 
-				// disable standard artifact, xsbt-webapp publishes webappWar
-				Keys.publishArtifact in (Compile, Keys.packageBin) := false,
+			// disable standard artifact, xsbt-webapp publishes webappWar
+			Keys.publishArtifact in (Compile, Keys.packageBin) := false,
 
-				// add war artifact
-				Keys.artifact in (Compile, webappWar) ~= {
-					_ withType "war" withExtension "war"
-				},
+			// add war artifact
+			Keys.artifact in (Compile, webappWar) ~= {
+				_ withType "war" withExtension "war"
+			},
 
-				// remove dependencies and repositories from pom
-				Keys.pomPostProcess		:= removeDependencies
-			) ++
-			addArtifact(Keys.artifact in (Compile, webappWar), webappWar)
+			// remove dependencies and repositories from pom
+			Keys.pomPostProcess		:= removeDependencies
+		) ++
+		addArtifact(Keys.artifact in (Compile, webappWar), webappWar)
 
 	//------------------------------------------------------------------------------
 	//## pom transformation
@@ -103,29 +103,29 @@ object WebAppPlugin extends AutoPlugin {
 			(new RuleTransformer(pomRewriteRule) transform node).head
 
 	private val pomRewriteRule	=
-			new RewriteRule {
-				override def transform(node:XmlNode):XmlNodeSeq =
-						node match {
-							case el:Elem if el.label == "dependency" =>
-								val organization	= childText(el, "groupId")
-								val artifact		= childText(el, "artifactId")
-								val version			= childText(el, "version")
-								val scope			= childText(el, "scope")
-								Comment(s"$organization#$artifact;$version ($scope)")
-							case el:Elem if el.label == "repository" =>
-								/*
-								val id		= childText(el, "id")
-								val name	= childText(el, "name")
-								val url		= childText(el, "url")
-								val layout	= childText(el, "layout")
-								*/
-								Comment(s"redacted")
-							case _ =>
-								node
-						}
-				private def childText(el:Elem, label:String):String	=
-						el.child filter { _.label == label } flatMap { _.text } mkString ""
-			}
+		new RewriteRule {
+			override def transform(node:XmlNode):XmlNodeSeq =
+				node match {
+					case el:Elem if el.label == "dependency" =>
+						val organization	= childText(el, "groupId")
+						val artifact		= childText(el, "artifactId")
+						val version			= childText(el, "version")
+						val scope			= childText(el, "scope")
+						Comment(s"$organization#$artifact;$version ($scope)")
+					case el:Elem if el.label == "repository" =>
+						/*
+						val id		= childText(el, "id")
+						val name	= childText(el, "name")
+						val url		= childText(el, "url")
+						val layout	= childText(el, "layout")
+						*/
+						Comment(s"redacted")
+					case _ =>
+						node
+				}
+			private def childText(el:Elem, label:String):String	=
+				el.child filter { _.label == label } flatMap { _.text } mkString ""
+		}
 
 	//------------------------------------------------------------------------------
 	//## tasks
