@@ -56,7 +56,7 @@ object WebAppPlugin extends AutoPlugin {
 			webappAppDir			:= webappBuildDir.value / "output" / webappPackageName.value,
 
 			webappStage				:= webappAssets.value.toVector ++ webappExtras.value.toVector,
-			webappAssetDir			:= (Keys.sourceDirectory in Compile).value / "webapp",
+			webappAssetDir			:= (Compile / Keys.sourceDirectory).value / "webapp",
 			webappAssets			:= xu.find allMapped webappAssetDir.value,
 			webappExtras			:= Seq.empty,
 
@@ -84,17 +84,17 @@ object WebAppPlugin extends AutoPlugin {
 			Keys.watchSources		:= Keys.watchSources.value :+ WatchSource(webappAssetDir.value),
 
 			// disable standard artifact, xsbt-webapp publishes webappWar
-			Keys.publishArtifact in (Compile, Keys.packageBin) := false,
+			Compile / Keys.packageBin / Keys.publishArtifact := false,
 
 			// add war artifact
-			Keys.artifact in (Compile, webappWar) ~= {
+			Compile / webappWar / Keys.artifact ~= {
 				_ withType "war" withExtension "war"
 			},
 
 			// remove dependencies and repositories from pom
 			Keys.pomPostProcess		:= removeDependencies
 		) ++
-		addArtifact(Keys.artifact in (Compile, webappWar), webappWar)
+		addArtifact(Compile / webappWar / Keys.artifact, webappWar)
 
 	//------------------------------------------------------------------------------
 	//## pom transformation
